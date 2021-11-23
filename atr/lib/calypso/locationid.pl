@@ -1,0 +1,430 @@
+#!/opt/local/bin/perl
+
+# Etrait les infos Zone et Gare de EventLocationId
+# voir http://www.journaldulapin.com/2013/02/10/lire-le-contenu-cache-dun-pass-navigo-sur-un-mac/
+# et http://aurelienb.pagesperso-orange.fr/HTML/transports/obli_metro.htm
+
+use  warnings;
+use strict ;
+
+use Data::Dumper ;
+
+# prototype to simplify syntax in map.
+# B5toint takes one scalar arg, can be omitted, $_ will be used if so.
+sub B5toint(_);
+
+while (<>) {
+    my ($bits, $zone, $station) ;
+    
+    chomp;
+    
+    unless (/^[0-9A-F]{1,4}$/i) {
+        warn("Format error. Expected: hex string of up to 4 chars ") ;
+        next ;
+    }
+    
+    # Add 0s in front to get 4 chars
+    $_ = "0" x (4-length) . uc ;
+    print "          HEX: $_\n" ;
+    
+    # Convert hex into bit string
+    # 12D0 => 0001 0010 1101 0000
+    $bits=unpack("B16",pack("H4", $_)) ;
+    print "          BIN: $bits\n";
+    
+    # discard the first 2 bits, and get the 2 groups of five that follow
+    ($zone, $station)=unpack("x2 A5 A5", $bits) ;
+    print "      Zone(b): ..$zone\n" ;
+    print "   Station(b): .......$station\n" ;
+    
+    # convert to int
+    ($zone,$station)=map B5toint, ($zone, $station) ;
+    
+    print "Zone-Station: $zone-$station"                   . "\n" ;
+    print "     Secteur: " . zone_name($zone)              . "\n";
+    print "     Station: " . station_name($zone, $station) . "\n" ;
+}
+
+# Returns integer value of bit field of length 5
+# example: "01001" returns 9
+sub B5toint(_) {
+    return unpack("C", pack("B8", "000" . shift)) ;
+}
+
+BEGIN {
+    # string to return when not found
+    my $unknown= 'unknown' ;
+    
+    my %secteur=map /\s*(\d\d)\s+(.*)/, split(/\n/, <<'END_SECTEUR' ) ;
+    01  Cité
+    02  Rennes
+    03  Villette
+    04  Montparnasse
+    05  Nation
+    06  St Lazare
+    07  Auteuil
+    08  République
+    09  Austerlitz
+    10  Invalides
+    11  Sentier
+    12  ïle St Louis
+    13  Daumesnil
+    14  Italie
+    15  Denfert
+    16  Félix Faure
+    17  Passy
+    18  Etoile
+    19  Clichy-St Ouen
+    20  Montmartre
+    21  Lafayette
+    22  Buttes Chaumont
+    23  Belleville
+    24  Père Lachaise
+    25  Charenton
+    26  Ivry-Villejuif
+    27  Vanves
+    28  Issy
+    29  Levallois
+    30  Péreire
+    31  Pigalle
+END_SECTEUR
+    # pasted from http://aurelienb.pagesperso-orange.fr/HTML/transports/obli_metro.htm
+
+    sub zone_name {
+        my $key=sprintf("%02d", shift) ;
+        return exists($secteur{$key}) ? $secteur{$key} : $unknown ;
+    }
+    
+    my %station=map /
+        (\d\d-\d\d)
+        \s+(.*?)\s*     # *? : non-greedy * so the following spaces are all eaten by \s* that follows.
+        .-\d\d-\d\d
+        /x         ,split(/\n/, <<'END_STATION');
+    01-01	SAINT-MICHEL	U-01-01
+    01-04	ODEON	U-01-04
+    01-05	CLUNY-LA-SORBONNE	U-01-05
+    01-06	MAUBERT-MUTUALITE	U-01-06
+    01-07	LUXEMBOURG	U-01-07
+    01-08	CHATELET	U-01-08
+    01-09	HALLES (LES)	U-01-09
+    01-10	Châtelet - Les Halles RER A (Ligne de contrôle séparant le RER et le métro et entrées et sorties  de la station)	U-01-10
+    01-11   Châtelet - Les Halles RER A (Ligne de contrôle séparant le RER et le métro) U-01-11
+    01-12	LOUVRE	U-01-12
+    01-13	PONT NEUF	U-01-13
+    01-14	CITE	U-01-14
+    01-15	HOTEL DE VILLE	U-01-15
+    02-02	CAMBRONNE	U-02-02
+    02-03	SEVRES-LECOURBE	U-02-03
+    02-04	SEGUR	U-02-04
+    02-06	SAINT-FRANCOIS-XAVIER	U-02-06
+    02-07	DUROC	U-02-07
+    02-08	VANEAU	U-02-08
+    02-09	SEVRES-BABYLONE	U-02-09
+    02-10	RUE DU BAC	U-02-10
+    02-11	RENNES	U-02-11
+    02-12	SAINT-SULPICE	U-02-12
+    02-14	MABILLON	U-02-14
+    02-15	SAINT-GERMAIN-DES-PRES	U-02-15
+    03-00	ST-MICHEL-NOTRE-DAME - c. RER B/métro (Ligne 10)	U-03-00
+    03-01	ST-MICHEL-NOTRE-DAME - c. métro/RER B (Ligne 10) et entrée normale	U-03-01
+    03-04	PORTE DE LA VILLETTE	U-03-04
+    03-05	AUBERVILLIERS-PANTIN-4 CHEMINS	U-03-05
+    03-06	FORT D'AUBERVILLIERS	U-03-06
+    03-07	COURNEUVE - 8	U-03-07
+    03-09	HOCHE	U-03-09
+    03-10	EGLISE DE PANTIN	U-03-10
+    03-11	BOBIGNY-PANTIN-RAYMOND QUENEAU	U-03-11
+    03-12	BOBIGNY-PABLO PICASSO	U-03-12
+    04-02	PERNETY	U-04-02
+    04-03	PLAISANCE	U-04-03
+    04-04	GAITE	U-04-04
+    04-06	EDGAR QUINET	U-04-06
+    04-07	VAVIN	U-04-07
+    04-08	MONTPARNASSE-BIENVENUE	U-04-08
+    04-12	SAINT-PLACIDE	U-04-12
+    04-14	NOTRE-DAME-DES-CHAMPS	U-04-14
+    05-02	ROBESPIERRE	U-05-02
+    05-03	PORTE DE MONTREUIL	U-05-03
+    05-04	MARAICHERS	U-05-04
+    05-05	BUZENVAL	U-05-05
+    05-06	RUE DES BOULETS	U-05-06
+    05-07	PORTE DE VINCENNES	U-05-07
+    05-09	PICPUS	U-05-09
+    05-10	NATION (métro)	U-05-10
+    05-12	AVRON	U-05-12
+    05-13	ALEXANDRE DUMAS	U-05-13
+    06-01	MALESHERBES	U-06-01
+    06-02	MONCEAU	U-06-02
+    06-03	VILLIERS	U-06-03
+    06-04	QUATRE SEPTEMBRE	U-06-04
+    06-05	OPERA	U-06-05
+    06-06   AUBER   U-06-06
+    06-07	HAVRE-CAUMARTIN	U-06-07
+    06-08   Saint-Lazare    U-06-08
+#   ^^^^  Ajout DA 14/02/2013
+    06-09	SAINT-LAZARE	U-06-09
+    06-10	SAINT-AUGUSTIN	U-06-10
+    06-12	EUROPE	U-06-12
+    06-13	LIEGE	U-06-13
+    07-03	PORTE DE SAINT-CLOUD	U-07-03
+    07-07	PORTE D'AUTEUIL	U-07-07
+    07-08	EGLISE D'AUTEUIL	U-07-08
+    07-09	MICHEL-ANGE-AUTEUIL	U-07-09
+    07-10	MICHEL-ANGE-MOLITOR	U-07-10
+    07-11	CHARDON-LAGACHE	U-07-11
+    07-12	MIRABEAU	U-07-12
+    07-14	EXELMANS	U-07-14
+    07-15	JASMIN	U-07-15
+    08-01	RAMBUTEAU	U-08-01
+    08-03	ARTS ET METIERS	U-08-03
+    08-04	JACQUES BONSERGENT	U-08-04
+    08-05	GONCOURT	U-08-05
+    08-06	TEMPLE	U-08-06
+    08-07	REPUBLIQUE	U-08-07
+    08-10	OBERKAMPF	U-08-10
+    08-11	PARMENTIER	U-08-11
+    08-12	FILLES DU CALVAIRE	U-08-12
+    08-13	SAINT-SEBASTIEN-FROISSART	U-08-13
+    08-14	RICHARD-LENOIR	U-08-14
+    08-15	SAINT-AMBROISE	U-08-15
+    09-01	QUAI DE LA GARE	U-09-01
+    09-02	CHEVALERET	U-09-02
+    09-04	SAINT-MARCEL	U-09-04
+    09-07	GARE D'AUSTERLITZ	U-09-07
+    09-08	GARE DE LYON Métro L. 1	U-09-08
+    09-10	QUAI DE LA RAPEE	U-09-10
+    09-13	GARE DE LYON - entrée et sortie RER A et correspondances	U-09-13
+    09-14	GARE DE LYON Métro L. 14 et RER A correspondance RER/métro	U-09-14
+    10-01	CHAMPS-ELYSEES-CLEMENCEAU	U-10-01
+    10-02	CONCORDE	U-10-02
+    10-03	MADELEINE	U-10-03
+    10-04	BIR-HAKEIM	U-10-04
+    10-07	ECOLE MILITAIRE	U-10-07
+    10-08	TOUR MAUBOURG	U-10-08
+    10-09	INVALIDES métro	U-10-09
+    10-10	INVALIDES – correspondance Métro/RER C	U-10-10
+    10-11	INVALIDES – correspondance RER/Métro C	U-10-11
+    10-11	SAINT-DENIS UNIVERSITE	U-10-11
+    10-12	VARENNE	U-10-12
+    10-13	ASSEMBLEE NATIONALE	U-10-13
+    10-14	SOLFERINO	U-10-14
+    11-01	TUILERIES	U-11-01
+    11-02	PALAIS-ROYAL-MUSEE DU LOUVRE	U-11-02
+    11-03	PYRAMIDES	U-11-03
+    11-04	BOURSE	U-11-04
+    11-06	RUE MONTMARTRE	U-11-06
+    11-07	RICHELIEU-DROUOT	U-11-07
+    11-08	BONNE NOUVELLE	U-11-08
+    11-10	STRASBOURG-SAINT-DENIS	U-11-10
+    11-11	CHATEAU D'EAU	U-11-11
+    11-13	SENTIER	U-11-13
+    11-14	REAUMUR-SEBASTOPOL	U-11-14
+    11-15	ETIENNE MARCEL	U-11-15
+    12-01	FAIDHERBE-CHALIGNY	U-12-01
+    12-02	REUILLY-DIDEROT	U-12-02
+    12-03	MONTGALLET	U-12-03
+    12-04	CENSIER-DAUBENTON	U-12-04
+    12-05	PLACE MONGE	U-12-05
+    12-06	CARDINAL LEMOINE	U-12-06
+    12-07	JUSSIEU	U-12-07
+    12-08	SULLY-MORLAND	U-12-08
+    12-09	PONT MARIE	U-12-09
+    12-10	SAINT-PAUL	U-12-10
+    12-12	BASTILLE	U-12-12
+    12-13	CHEMIN VERT	U-12-13
+    12-14	BREGUET-SABIN	U-12-14
+    12-15	LEDRU-ROLLIN	U-12-15
+    13-01	PORTE DOREE	U-13-01
+    13-03	PORTE DE CHARENTON	U-13-03
+    13-07	BERCY	U-13-07
+    13-08	DUGOMMIER	U-13-08
+    13-10	MICHEL BIZOT	U-13-10
+    13-11	DAUMESNIL	U-13-11
+    13-12	BEL-AIR	U-13-12
+    14-02	PORTE DE CHOISY	U-14-02
+    14-03	PORTE D'ITALIE	U-14-03
+    14-04	CITE UNIVERSITAIRE	U-14-04
+    14-09	MAISON BLANCHE	U-14-09
+    14-10	TOLBIAC	U-14-10
+    14-11	NATIONALE	U-14-11
+    14-12	CAMPO-FORMIO	U-14-12
+    14-13	GOBELINS (LES)	U-14-13
+    14-14	PLACE D'ITALIE	U-14-14
+    14-15	CORVISART	U-14-15
+    15-01	COUR SAINT EMILION	U-15-01
+    15-02	PORTE D'ORLEANS	U-15-02
+    15-03	BIBLIOTHEQUE FRANCOIS MITTERRAND	U-15-03
+    15-04	MOUTON-DUVERNET	U-15-04
+    15-05	ALESIA	U-15-05
+    15-06	OLYMPIADES	U-15-06
+    15-08	GLACIERE	U-15-08
+    15-09	SAINT-JACQUES	U-15-09
+    15-10	RASPAIL	U-15-10
+    15-12	PORT ROYAL	U-15-12
+    15-13	DENFERT-ROCHEREAU RER B correspondance métro-RER et entrée/sortie normale	U-15-13
+    15-14	DENFERT-ROCHEREAU métro	U-15-14
+    15-15   Denfert Rochereau RER B correspondance métro/RER    U-15-15
+    16-01	FALGUIERE	U-16-01
+    16-02	PASTEUR	U-16-02
+    16-03	VOLONTAIRES	U-16-03
+    16-04	VAUGIRARD	U-16-04
+    16-05	CONVENTION	U-16-05
+    16-06	PORTE DE VERSAILLES	U-16-06
+    16-09	BALARD	U-16-09
+    16-10	LOURMEL	U-16-10
+    16-11	BOUCICAUT	U-16-11
+    16-12	FELIX	U-16-12
+    16-13	CHARLES MICHELS	U-16-13
+    16-14	JAVEL-ANDRE CITROEN	U-16-14
+    17-01   Charles de Gaulle - Etoile RER  U-17-01
+    17-02	PORTE DAUPHINE	U-17-02
+    17-04	MOTTE-PICQUET-GRENELLE (LA)	U-17-04
+    17-05	COMMERCE	U-17-05
+    17-06	AVENUE EMILE ZOLA	U-17-06
+    17-07	DUPLEIX	U-17-07
+    17-08	PASSY	U-17-08
+    17-09	RANELAGH	U-17-09
+    17-11	MUETTE (LA)	U-17-11
+    17-13	RUE	U-17-13
+    17-14	BOISSIERE	U-17-14
+    17-15	TROCADERO	U-17-15
+    18-01	IENA	U-18-01
+    18-03	ALMA-MARCEAU	U-18-03
+    18-04	MIROMESNIL	U-18-04
+    18-05	SAINT-PHILIPPE-DU-ROULE	U-18-05
+    18-07	FRANKLIN-D-ROOSEVELT	U-18-07
+    18-08	GEORGE	U-18-08
+    18-09	KLEBER	U-18-09
+    18-10	VICTOR HUGO	U-18-10
+    18-11	ARGENTINE	U-18-11
+    18-12	CHARLES DE GAULLE-ETOILE	U-18-12
+    18-14	TERNES	U-18-14
+    18-15	COURCELLES	U-18-15
+    19-01	MAIRIE DE CLICHY	U-19-01
+    19-02	ASNIERES GENNEVILLIERS GABRIEL PERI	U-19-02
+    19-03	ASNIERES GENNEVILLIERS LES AGNETTES	U-19-03
+    19-04	ASNIERES GENNEVILLIERS LES COURTILLES	U-19-04
+    19-09   GARE DU NORD (Accès par La Chapelle) entrée/sortie  U-19-09
+    19-10	GARIBALDI	U-19-10
+    19-11	MAIRIE DE SAINT-OUEN	U-19-11
+    19-13	CARREFOUR PLEYEL	U-19-13
+    19-14	SAINT-DENIS PORTE DE PARIS	U-19-14
+    19-15	SAINT-DENIS-BASILIQUE	U-19-15
+    20-01	PORTE DE CLIGNANCOURT	U-20-01
+    20-06	PORTE DE LA CHAPELLE	U-20-06
+    20-07	MAX DORMOY	U-20-07
+    20-09	MARCADET-POISSONNIERS	U-20-09
+    20-10	SIMPLON	U-20-10
+    20-11	JULES JOFFRIN	U-20-11
+    20-12	LAMARCK-CAULAINCOURT	U-20-12
+    21-01	CHAUSSEE D'ANTIN	U-21-01
+    21-02	PELETIER (LE)	U-21-02
+    21-03	CADET	U-21-03
+    21-04	CHATEAU-ROUGE	U-21-04
+    21-07	BARBES-ROCHECHOUART	U-21-07
+    21-08	GARE DU NORD	U-21-08
+    21-09	GARE DE L'EST	U-21-09
+    21-10	POISSONNIERE	U-21-10
+    21-11	CHATEAU-LANDON	U-21-11
+    22-01	PORTE DE PANTIN	U-22-01
+    22-02	OURCQ	U-22-02
+    22-04	CORENTIN CARIOU	U-22-04
+    22-06	CRIMEE	U-22-06
+    22-08	RIQUET	U-22-08
+    22-10	LOUIS BLANC	U-22-10
+    22-11	STALINGRAD	U-22-11
+    22-12	JAURES	U-22-12
+    22-13	LAUMIERE	U-22-13
+    22-14	BOLIVAR	U-22-14
+    22-15	COLONEL FABIEN	U-22-15
+    23-02	PORTE DES LILAS	U-23-02
+    23-03	MAIRIE DES LILAS	U-23-03
+    23-04	PORTE DE BAGNOLET	U-23-04
+    23-05	GALLIENI	U-23-05
+    23-08	PLACE DES FETES	U-23-08
+    23-09	BOTZARIS	U-23-09
+    23-10	DANUBE	U-23-10
+    23-11	PRE-SAINT-GERVAIS	U-23-11
+    23-13	BUTTES-CHAUMONT	U-23-13
+    23-14	JOURDAIN	U-23-14
+    23-15	TELEGRAPHE	U-23-15
+    24-01	VOLTAIRE	U-24-01
+    24-02	CHARONNE	U-24-02
+    24-04	PERE-LACHAISE	U-24-04
+    24-05	MENILMONTANT	U-24-05
+    24-06	SAINT-MAUR	U-24-06
+    24-07	PHILIPPE-AUGUSTE	U-24-07
+    24-08	SAINT-FARGEAU	U-24-08
+    24-09	PELLEPORT	U-24-09
+    24-10	GAMBETTA	U-24-10
+    24-12	BELLEVILLE	U-24-12
+    24-13	COURONNES	U-24-13
+    24-14	PYRENEES	U-24-14
+    25-02	CROIX DE CHAVAUX	U-25-02
+    25-03	MAIRIE DE MONTREUIL	U-25-03
+    25-04	MAISONS-ALFORT-LES JUILLIOTTES	U-25-04
+    25-05	CRETEIL-L'ECHAT	U-25-05
+    25-06	CRETEIL-UNIVERSITE	U-25-06
+    25-07	CRETEIL-PREFECTURE	U-25-07
+    25-08	SAINT-MANDE-TOURELLE	U-25-08
+    25-10	BERAULT	U-25-10
+    25-11	CHATEAU DE VINCENNES	U-25-11
+    25-12	LIBERTE	U-25-12
+    25-13	CHARENTON-ECOLES	U-25-13
+    25-14	ECOLE VETERINAIRE DE MAISONS ALFORT	U-25-14
+    25-15	MAISONS-ALFORT-STADE	U-25-15
+    26-03	PORTE D'IVRY	U-26-03
+    26-04	PIERRE ET MARIE CURIE	U-26-04
+    26-05	MAIRIE D'IVRY	U-26-05
+    26-06	KREMLIN-BICETRE (LE)	U-26-06
+    26-07	VILLEJUIF-LEO LAGRANGE	U-26-07
+    26-08	VILLEJUIF-P.VAILLANT COUTURIER	U-26-08
+    26-09	VILLEJUIF-LOUIS ARAGON	U-26-09
+    27-02	PORTE DE VANVES	U-27-02
+    27-07	MALAKOFF-PLATEAU DE VANVES	U-27-07
+    27-08	MALAKOFF-RUE ETIENNE DOLET	U-27-08
+    27-09	CHATILLON-MONTROUGE	U-27-09
+    28-02	CORENTIN CELTON	U-28-02
+    28-03	MAIRIE D'ISSY	U-28-03
+    28-08	MARCEL SEMBAT	U-28-08
+    28-09	BILLANCOURT	U-28-09
+    28-10	PONT DE SEVRES	U-28-10
+    29-00	GRANDE ARCHE DE LA DEFENSE c. RER	U-29-00
+    29-04	BOULOGNE JEAN JAURES	U-29-04
+    29-05	BOULOGNE PONT DE SAINT-CLOUD	U-29-05
+    29-08	SABLONS (LES)	U-29-08
+    29-09	PONT DE NEUILLY	U-29-09
+    29-10	ESPLANADE DE LA DEFENSE	U-29-10
+    29-11	G.ARCHE DE LA DEFENSE - entrée et sortie	U-29-11
+    29-12	PORTE DE CHAMPERRET	U-29-12
+    29-13	LOUISE MICHEL	U-29-13
+    29-14	ANATOLE FRANCE	U-29-14
+    29-15	PONT DE LEVALLOIS-BECON	U-29-15
+    30-01	PORTE MAILLOT	U-30-01
+    30-04	WAGRAM	U-30-04
+    30-05	PEREIRE	U-30-05
+    30-08	BROCHANT	U-30-08
+    30-09	PORTE DE CLICHY	U-30-09
+    30-12	GUY MOQUET	U-30-12
+    30-13	PORTE DE SAINT-OUEN	U-30-13
+    31-02	FUNICULAIRE (station inférieure)	U-31-02
+    31-03	FUNICULAIRE (station supérieure)	U-31-03
+    31-04	ANVERS	U-31-04
+    31-05	ABBESSES	U-31-05
+    31-06	PIGALLE	U-31-06
+    31-07	BLANCHE	U-31-07
+    31-08	TRINITE-D'ESTIENNE D'ORVES	U-31-08
+    31-09	NOTRE-DAME-DE-LORETTE	U-31-09
+    31-10	SAINT-GEORGES	U-31-10
+    31-12	ROME	U-31-12
+    31-13	PLACE DE CLICHY	U-31-13
+    31-14	FOURCHE (LA)	U-31-14
+END_STATION
+# pasted from http://aurelienb.pagesperso-orange.fr/HTML/transports/obli_metro.htm
+    
+    sub station_name{
+        my $key = sprintf( "%02d-%02d", @_[(0,1)] );
+        return exists $station{$key} ? $station{$key} : $unknown;
+    }
+}
+
